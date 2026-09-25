@@ -1,0 +1,3 @@
+backend/_pycache_
+backend/employees.db
+frontend/node_modules
