@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 import models, schemas, auth
@@ -8,59 +8,49 @@ from database import Base, engine, get_db
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
 
 # --- HELPERS ---
 def require_admin(current_user = Depends(auth.get_current_user_with_role)):
-    if current_user.role!= "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return current_user
 
 # --- AUTH ROUTES ---
-@app.post("/register")
-def register(
-    user: schemas.UserCreate,
-    db: Session = Depends(get_db),
-    current_user = Depends(auth.get_current_user_with_role) if False else None
-):
-    # Logic: If DB empty -> allow first admin creation without token
-    # If DB not empty -> require admin token
-    user_count = db.query(models.User).count()
-
-    if user_count > 0:
-        # Need admin - manually check header
-        from fastapi.security import OAuth2PasswordBearer
-        from jose import JWTError, jwt
-        # This will throw 401 if not logged in
-        # So we need current_user
-        pass
-
-    existing = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username taken")
-
-    # First user is always admin
-    role = "admin" if db.query(models.User).count() == 0 else user.role
-    new_user = models.User(username=user.username, hashed_password=auth.hash_password(user.password), role=role)
-    db.add(new_user); db.commit(); db.refresh(new_user)
-    return {"msg": f"User {new_user.username} created as {role}", "role": role}
-
-# Better version - 2 endpoints
+# 1. Create very first admin - NO TOKEN NEEDED
 @app.post("/create-first-admin")
 def create_first_admin(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    if db.query(models.User).count()!= 0:
+    if db.query(models.User).count() != 0:
         raise HTTPException(status_code=400, detail="Admin already exists. Login as admin to create users.")
-    new_user = models.User(username=user.username, hashed_password=auth.hash_password(user.password), role="admin")
-    db.add(new_user); db.commit()
+    new_user = models.User(
+        username=user.username, 
+        hashed_password=auth.hash_password(user.password), 
+        role="admin"
+    )
+    db.add(new_user)
+    db.commit()
     return {"msg": "First admin created. Now login."}
 
+# 2. Create any other user - ADMIN ONLY
 @app.post("/create-user")
 def create_user(user: schemas.UserCreate, current_user = Depends(require_admin), db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.username == user.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username taken")
-    new_user = models.User(username=user.username, hashed_password=auth.hash_password(user.password), role=user.role)
-    db.add(new_user); db.commit(); db.refresh(new_user)
+    new_user = models.User(
+        username=user.username, 
+        hashed_password=auth.hash_password(user.password), 
+        role=user.role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
     return {"msg": f"User {new_user.username} created as {new_user.role}", "username": new_user.username, "role": new_user.role}
 
 @app.post("/login")
@@ -79,7 +69,7 @@ def me(current_user = Depends(auth.get_current_user_with_role)):
 def list_users(current_user = Depends(require_admin), db: Session = Depends(get_db)):
     return db.query(models.User).all()
 
-# --- EMPLOYEES ---
+# --- EMPLOYEES (Admin only for write) ---
 @app.get("/employees", response_model=list[schemas.EmployeeResponse])
 def get_employees(current_user = Depends(auth.get_current_user_with_role), db: Session = Depends(get_db)):
     return db.query(models.Employee).all()
