@@ -13,4 +13,17 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Optional: auto-logout on 401 expired token
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('role');
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default API;

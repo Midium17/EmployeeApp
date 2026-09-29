@@ -6,8 +6,15 @@ import Login from './pages/Login';
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
 
+  // FIX: this will be called after login saves to localStorage
+  const handleLogin = () => {
+    setToken(localStorage.getItem("token"));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("username");
     setToken(null);
   };
 
@@ -26,7 +33,7 @@ export default function App() {
         <Route 
           path="/login" 
           element={
-            !token ? <Login setToken={setToken} /> : <Navigate to="/" replace />
+            !token ? <Login onLogin={handleLogin} setToken={setToken} /> : <Navigate to="/" replace />
           } 
         />
 

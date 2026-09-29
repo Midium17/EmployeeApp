@@ -1,59 +1,62 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import API from '../api/axios';
 
-export default function Login({ setToken }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+export default function Login({ onLogin, setToken }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isFirstAdmin, setIsFirstAdmin] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const form = new FormData();
-      form.append('username', username);
-      form.append('password', password);
-      
-      const res = await API.post('/login', form);
-      localStorage.setItem('token', res.data.access_token);
-      setToken(res.data.access_token);
-      navigate('/');
+      const formData = new FormData();
+      formData.append("username", username);
+      formData.append("password", password);
+      const res = await API.post('/login', formData);
+      localStorage.setItem("token", res.data.access_token);
+      localStorage.setItem("role", res.data.role);
+      localStorage.setItem("username", res.data.username);
+      if (setToken) setToken(res.data.access_token);
+      if (onLogin) onLogin();
+      return;
     } catch (err) {
-      alert('Login failed. Check your credentials.');
+      setError(err.response?.data?.detail || "Login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRegister = async () => {
+  const handleCreateFirstAdmin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      await API.post('/register', { username, password });
-      alert('Registered successfully! Now log in.');
+      await API.post('/create-first-admin', { username, password, role: "admin" });
+      alert("First admin created! Now login.");
+      setIsFirstAdmin(false);
     } catch (err) {
-      alert('Registration failed. Username might already exist.');
+      setError(err.response?.data?.detail || "Failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: 40, maxWidth: 300, margin: 'auto', fontFamily: 'sans-serif' }}>
-      <h2>Login / Register</h2>
-      <form onSubmit={handleLogin}>
-        <input 
-          placeholder="Username" 
-          value={username} 
-          onChange={e => setUsername(e.target.value)} 
-          style={{ width: '100%', marginBottom: 10, padding: 8 }} 
-          required
-        />
-        <input 
-          placeholder="Password" 
-          type="password" 
-          value={password} 
-          onChange={e => setPassword(e.target.value)} 
-          style={{ width: '100%', marginBottom: 10, padding: 8 }} 
-          required
-        />
-        <button type="submit" style={{ width: '100%', padding: 8, marginBottom: 5 }}>Login</button>
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: 20, border: "1px solid #ccc", borderRadius: 8 }}>
+      <h2>{isFirstAdmin ? "Create First Admin" : "Login"}</h2>
+      <form onSubmit={isFirstAdmin ? handleCreateFirstAdmin : handleLogin}>
+        <input placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 10 }} required />
+        <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 10 }} required />
+        <button disabled={loading} style={{ width: "100%", padding: 10, background: "green", color: "white", border: "none" }}>{loading ? "..." : (isFirstAdmin ? "Create Admin" : "Login")}</button>
       </form>
-      <button onClick={handleRegister} style={{ width: '100%', padding: 8, background: '#eee' }}>Register</button>
+      {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+      <p style={{ fontSize: 12, textAlign: "center" }}>
+        <span onClick={() => setIsFirstAdmin(!isFirstAdmin)} style={{ color: "blue", cursor: "pointer" }}>{isFirstAdmin ? "Back to Login" : "No admin yet? Create First Admin"}</span>
+      </p>
     </div>
   );
 }
