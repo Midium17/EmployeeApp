@@ -7,5 +7,10 @@ class EmployeeCreate(BaseModel):
 
 class EmployeeResponse(EmployeeCreate):
     id: int
+    owner_id: int
     class Config:
         from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
