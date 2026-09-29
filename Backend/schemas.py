@@ -14,3 +14,4 @@ class EmployeeResponse(EmployeeCreate):
 class UserCreate(BaseModel):
     username: str
     password: str
+    role: str = "user"  # user can request admin, but we will control it
